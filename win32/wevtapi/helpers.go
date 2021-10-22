@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"strconv"
 	"syscall"
 	"unsafe"
 
@@ -126,6 +127,7 @@ type XMLEvent struct {
 			UserID string `xml:"UserID,attr"`
 		} `xml:"Security"`
 	} `xml:"System"`
+	Message string
 }
 
 // ToMap converts an XMLEvent to an accurate structure to be serialized
@@ -169,6 +171,7 @@ func (xe *XMLEvent) ToJSONEvent() *JSONEvent {
 	je.Event.System.Channel = xe.System.Channel
 	je.Event.System.Computer = xe.System.Computer
 	je.Event.System.Security.UserID = xe.System.Security.UserID
+	je.Event.Message = xe.Message
 	return &je
 }
 
@@ -179,6 +182,7 @@ type JSONEvent struct {
 	Event struct {
 		EventData map[string]string      `xml:"EventData" json:",omitempty"`
 		UserData  map[string]interface{} `json:",omitempty"`
+		Message   string
 		System    struct {
 			Provider struct {
 				Name string `xml:"Name,attr"`
@@ -234,7 +238,7 @@ func GotSignal(signals chan bool) (signal bool, gotsig bool) {
 	return false, false
 }
 
-func enumerateEvents(sub EVT_HANDLE, channel string, out chan *XMLEvent) (err error) {
+func enumerateEvents(sub EVT_HANDLE, channel string, out chan *XMLEvent, render bool) (err error) {
 	for {
 		// Try to get events
 		events, err := EvtNext(sub, win32.INFINITE)
@@ -261,6 +265,15 @@ func enumerateEvents(sub EVT_HANDLE, channel string, out chan *XMLEvent) (err er
 				log.Errorf("Cannot unmarshal event: %s", err)
 				log.Debugf("Event unmarshal failure: %s", dataUTF8)
 			}
+
+			if render {
+				numericalEID, _ := strconv.Atoi(e.System.EventID)
+
+				msg, _ := EvtFormatMessage(evt, e.System.Provider.Name, numericalEID)
+				msgUTF8 := win32.UTF16BytesToString(msg)
+				e.Message = msgUTF8
+			}
+
 			// Pushing reference to XMLEvent into the channel
 			out <- &e
 
@@ -283,7 +296,7 @@ func NewPullEventProvider() *PullEventProvider {
 }
 
 // FetchEvents implements EventProvider interface
-func (e *PullEventProvider) FetchEventsQuery(channels []string, flag int, query string) (c chan *XMLEvent) {
+func (e *PullEventProvider) FetchEventsQuery(channels []string, flag int, query string, render bool) (c chan *XMLEvent) {
 	// Prep the chan
 	c = make(chan *XMLEvent, 242)
 	events := make([]win32.HANDLE, len(channels))
@@ -358,7 +371,7 @@ func (e *PullEventProvider) FetchEventsQuery(channels []string, flag int, query 
 				// it did it already and we reset the event) so WaitForSingleObject will return
 				// only timeouts. Took a while to find this explaination ...
 				kernel32.ResetEvent(events[rc])
-				if err := enumerateEvents(subs[rc], channels[rc], c); err.(syscall.Errno) != win32.ERROR_NO_MORE_ITEMS {
+				if err := enumerateEvents(subs[rc], channels[rc], c, render); err.(syscall.Errno) != win32.ERROR_NO_MORE_ITEMS {
 					// If != of Exit Success
 					if err.(syscall.Errno) != 0 {
 						log.Errorf("Failed to enumerate events for channel %s: %s", channels[rc], err)
@@ -375,7 +388,11 @@ func (e *PullEventProvider) FetchEventsQuery(channels []string, flag int, query 
 }
 
 func (e *PullEventProvider) FetchEvents(channels []string, flag int) (c chan *XMLEvent) {
-	return e.FetchEventsQuery(channels, flag, "*")
+	return e.FetchEventsQuery(channels, flag, "*", false)
+}
+
+func (e *PullEventProvider) FetchRenderedEvents(channels []string, flag int) (c chan *XMLEvent) {
+	return e.FetchEventsQuery(channels, flag, "*", true)
 }
 
 // Stop implements EventProvider interface
@@ -410,7 +427,7 @@ func pepCallback(Action EVT_SUBSCRIBE_NOTIFY_ACTION, UserContext win32.PVOID, Ev
 		ctx.xmlRenderedEvents <- data
 	case EvtSubscribeActionError:
 		if Event == ERROR_EVT_QUERY_RESULT_STALE {
-			ctx.lastError = fmt.Errorf("Event record is missing")
+			ctx.lastError = fmt.Errorf("event record is missing")
 			log.Error(ctx.lastError)
 		} else {
 			ctx.lastError = syscall.Errno(Event)

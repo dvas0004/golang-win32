@@ -33,6 +33,16 @@ const (
 	EvtSubscribeTolerateQueryErrors = 0x1000
 	EvtSubscribeStrict              = 0x10000
 	//} EVT_SUBSCRIBE_FLAGS;
+
+	EvtFormatMessageChannel  = 6
+	EvtFormatMessageEvent    = 1
+	EvtFormatMessageId       = 8
+	EvtFormatMessageKeyword  = 5
+	EvtFormatMessageLevel    = 2
+	EvtFormatMessageOpcode   = 4
+	EvtFormatMessageProvider = 7
+	EvtFormatMessageTask     = 3
+	EvtFormatMessageXml      = 9
 )
 
 const (

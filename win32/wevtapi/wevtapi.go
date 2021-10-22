@@ -137,3 +137,47 @@ func EvtRenderXML(Context EVT_HANDLE) ([]byte, error) {
 	}
 	return buffer[:BufferUsed], nil
 }
+
+func EvtOpenPublisherMetadata(name string) (EVT_HANDLE, error) {
+	publisherName, _ := syscall.UTF16PtrFromString(name)
+	r0, _, e1 := evtOpenPublisherMetadata.Call(
+		uintptr(0),
+		uintptr(unsafe.Pointer(publisherName)),
+		uintptr(0),
+		uintptr(0),
+		uintptr(0),
+	)
+
+	handle := EVT_HANDLE(r0)
+	var err error
+	if handle == 0 {
+		err = e1
+	}
+
+	return handle, err
+}
+
+func EvtFormatMessage(evtHandle EVT_HANDLE, publisher string, MessageId int) ([]byte, error) {
+	// 65536 buffsize
+	const buffSize = 0x1 << 16
+	var buffer [buffSize]byte
+	var BufferUsed win32.DWORD
+
+	publisherMetadata, _ := EvtOpenPublisherMetadata(publisher)
+
+	r1, _, lastErr := evtFormatMessage.Call(
+		uintptr(publisherMetadata),
+		uintptr(evtHandle),
+		uintptr(win32.DWORD(MessageId)),
+		uintptr(0),
+		uintptr(0),
+		uintptr(EvtFormatMessageEvent),
+		uintptr(buffSize),
+		uintptr(unsafe.Pointer(&buffer[0])),
+		uintptr(unsafe.Pointer(&BufferUsed)))
+
+	if win32.BOOL(r1) == win32.FALSE {
+		return buffer[:], lastErr
+	}
+	return buffer[:BufferUsed], nil
+}
