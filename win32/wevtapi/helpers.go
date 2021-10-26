@@ -308,7 +308,7 @@ func (e *PullEventProvider) FetchEventsQuery(channels []string, flag int, query 
 		// If we reuse name, we reuse event, even across processes
 		eUUID, err := win32.UUID()
 		if err != nil {
-			log.Panic(fmt.Errorf("Cannot generate UUID: %s", err))
+			log.Panic(fmt.Errorf("cannot generate uuid: %s", err))
 		}
 
 		log.Debugf("Windows Event UUID (Channel:%s): %s", channel, eUUID)
