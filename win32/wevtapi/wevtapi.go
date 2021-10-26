@@ -157,7 +157,17 @@ func EvtOpenPublisherMetadata(name string) (EVT_HANDLE, error) {
 	return handle, err
 }
 
-func EvtFormatMessage(evtHandle EVT_HANDLE, publisher string, MessageId int) ([]byte, error) {
+// Message Flags should be one of:
+// EvtFormatMessageChannel
+// 	EvtFormatMessageEvent
+// 	EvtFormatMessageId
+// 	EvtFormatMessageKeyword
+// 	EvtFormatMessageLevel
+// 	EvtFormatMessageOpcode
+// 	EvtFormatMessageProvider
+// 	EvtFormatMessageTask
+// 	EvtFormatMessageXml
+func EvtFormatMessage(evtHandle EVT_HANDLE, publisher string, MessageId int, MessageFlags int) ([]byte, error) {
 	// 65536 buffsize
 	const buffSize = 0x1 << 16
 	var buffer [buffSize]byte
@@ -171,7 +181,7 @@ func EvtFormatMessage(evtHandle EVT_HANDLE, publisher string, MessageId int) ([]
 		uintptr(win32.DWORD(MessageId)),
 		uintptr(0),
 		uintptr(0),
-		uintptr(EvtFormatMessageEvent),
+		uintptr(MessageFlags),
 		uintptr(buffSize),
 		uintptr(unsafe.Pointer(&buffer[0])),
 		uintptr(unsafe.Pointer(&BufferUsed)))

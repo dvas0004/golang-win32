@@ -127,7 +127,11 @@ type XMLEvent struct {
 			UserID string `xml:"UserID,attr"`
 		} `xml:"Security"`
 	} `xml:"System"`
-	Message string
+	Message  string
+	Keywords string
+	Opcode   string
+	Level    string
+	Task     string
 }
 
 // ToMap converts an XMLEvent to an accurate structure to be serialized
@@ -269,9 +273,25 @@ func enumerateEvents(sub EVT_HANDLE, channel string, out chan *XMLEvent, render 
 			if render {
 				numericalEID, _ := strconv.Atoi(e.System.EventID)
 
-				msg, _ := EvtFormatMessage(evt, e.System.Provider.Name, numericalEID)
+				msg, _ := EvtFormatMessage(evt, e.System.Provider.Name, numericalEID, EvtFormatMessageEvent)
 				msgUTF8 := win32.UTF16BytesToString(msg)
 				e.Message = msgUTF8
+
+				level, _ := EvtFormatMessage(evt, e.System.Provider.Name, numericalEID, EvtFormatMessageLevel)
+				levelUTF8 := win32.UTF16BytesToString(level)
+				e.Level = levelUTF8
+
+				task, _ := EvtFormatMessage(evt, e.System.Provider.Name, numericalEID, EvtFormatMessageTask)
+				taskUTF8 := win32.UTF16BytesToString(task)
+				e.Task = taskUTF8
+
+				opcode, _ := EvtFormatMessage(evt, e.System.Provider.Name, numericalEID, EvtFormatMessageOpcode)
+				opcodeUTF8 := win32.UTF16BytesToString(opcode)
+				e.Opcode = opcodeUTF8
+
+				keyword, _ := EvtFormatMessage(evt, e.System.Provider.Name, numericalEID, EvtFormatMessageKeyword)
+				keywordUTF8 := win32.UTF16BytesToString(keyword)
+				e.Keywords = keywordUTF8
 			}
 
 			// Pushing reference to XMLEvent into the channel
