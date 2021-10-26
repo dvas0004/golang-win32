@@ -176,6 +176,10 @@ func (xe *XMLEvent) ToJSONEvent() *JSONEvent {
 	je.Event.System.Computer = xe.System.Computer
 	je.Event.System.Security.UserID = xe.System.Security.UserID
 	je.Event.Message = xe.Message
+	je.Event.Keywords = xe.Keywords
+	je.Event.Opcode = xe.Opcode
+	je.Event.Level = xe.Level
+	je.Event.Task = xe.Task
 	return &je
 }
 
@@ -187,6 +191,10 @@ type JSONEvent struct {
 		EventData map[string]string      `xml:"EventData" json:",omitempty"`
 		UserData  map[string]interface{} `json:",omitempty"`
 		Message   string
+		Keywords  string
+		Opcode    string
+		Level     string
+		Task      string
 		System    struct {
 			Provider struct {
 				Name string `xml:"Name,attr"`
