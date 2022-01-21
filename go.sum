@@ -1,5 +1,7 @@
 github.com/0xrawsec/golang-utils v1.3.0 h1:fMgwKu5M2PXFwEfwN9B2T1bfg7LPCaV9fL6Xs/nf2Ps=
 github.com/0xrawsec/golang-utils v1.3.0/go.mod h1:DADTtCFY10qXjWmUVhhJqQIZdSweaHH4soYUDEi8mj0=
+github.com/0xrawsec/golang-utils v1.3.1 h1:jjiBzsxzcQPkmEV5KONJY4OnCoqTTW1eQMJcpSdk3hw=
+github.com/0xrawsec/golang-utils v1.3.1/go.mod h1:DADTtCFY10qXjWmUVhhJqQIZdSweaHH4soYUDEi8mj0=
 github.com/0xrawsec/golang-win32 v1.0.12 h1:n7KxFvO2cMr9MrXMlt+F54kLHcQBp0bBjR0wegb+h7Y=
 github.com/0xrawsec/golang-win32 v1.0.12/go.mod h1:LDGq8VzCwLZccK1qg7oKBc8n5DmPLi79w+wjew1UApg=
 github.com/kr/fs v0.1.0/go.mod h1:FFnZGqtBN9Gxj7eW1uZ42v5BccTP0vu6NEaFoC2HwRg=
