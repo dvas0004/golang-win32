@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 package wevtapi
 
 import (
@@ -336,7 +339,7 @@ func (e *PullEventProvider) FetchEventsQuery(channels []string, flag int, query 
 		// If we reuse name, we reuse event, even across processes
 		eUUID, err := win32.UUID()
 		if err != nil {
-			log.Panic(fmt.Errorf("cannot generate uuid: %s", err))
+			log.Abort(1, fmt.Errorf("Cannot generate UUID: %s", err))
 		}
 
 		log.Debugf("Windows Event UUID (Channel:%s): %s", channel, eUUID)
@@ -430,6 +433,10 @@ func (e *PullEventProvider) Stop() {
 
 /////////////////////////// PushEventProvider //////////////////////////////////
 
+const (
+	pushProviderChanSize = 42
+)
+
 // PushEventProvider relies on push EventSubscribe design pattern (i.e. using a callback)
 // function when calling EventSubscribe API
 type PushEventProvider struct {
@@ -469,12 +476,12 @@ func pepCallback(Action EVT_SUBSCRIBE_NOTIFY_ACTION, UserContext win32.PVOID, Ev
 func NewPushEventProvider() *PushEventProvider {
 	return &PushEventProvider{
 		make([]EVT_HANDLE, 0),
-		&pepContext{make(chan []byte, 242), nil}}
+		&pepContext{make(chan []byte, pushProviderChanSize), nil}}
 }
 
 // FetchEvents implements EventProvider interface
 func (p *PushEventProvider) FetchEvents(channels []string, flag int) (c chan *XMLEvent) {
-	c = make(chan *XMLEvent)
+	c = make(chan *XMLEvent, pushProviderChanSize)
 
 	// Initializing all the events to listen to
 	for _, channel := range channels {

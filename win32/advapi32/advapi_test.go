@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 package advapi32
 
 import (
@@ -15,7 +18,14 @@ import (
 )
 
 var (
-	DNSGuid, _ = GUIDFromString("{1C95126E-7EEA-49A9-A3FE-A378B03DDB4D}")
+	DNSGuid, _                = GUIDFromString("{1C95126E-7EEA-49A9-A3FE-A378B03DDB4D}")
+	SysmonGuid, _             = GUIDFromString("{5770385F-C22A-43E0-BF4C-06F5698FFBD9}")
+	COMGuid, _                = GUIDFromString("{D4263C98-310C-4D97-BA39-B55354F08584}")
+	KernelMemoryGUID, _       = GUIDFromString("{D1D93EF7-E1F2-4F45-9943-03D245FE6C00}")
+	SecurityAuditing, _       = GUIDFromString("{54849625-5478-4994-A5BA-3E3B0328C30D}")
+	URLMon, _                 = GUIDFromString("{245F975D-909D-49ED-B8F9-9A75691D6B6B}")
+	Microsoft_Windows_Ntfs, _ = GUIDFromString("{3FF37A1C-A68D-4D6E-8C9B-F79E8B16C482}")
+	Ntfs, _                   = GUIDFromString("{DD70BC80-EF44-421B-8AC3-CD31DA613A4E}")
 )
 
 func MakeSessionProperty(sessionName string) (*EventTraceProperties, uint32) {
@@ -29,8 +39,8 @@ func NewRealTimeSessionProperty(logSessionName string) *EventTraceProperties {
 
 	// Necessary fields for SessionProperties struct
 	sessionProperties.Wnode.BufferSize = size
-	sessionProperties.Wnode.Guid = GUID{} // To set
-	sessionProperties.Wnode.ClientContext = 0
+	sessionProperties.Wnode.Guid = GUID{}     // To set
+	sessionProperties.Wnode.ClientContext = 1 // QPC
 	sessionProperties.Wnode.Flags = WNODE_FLAG_ALL_DATA
 	sessionProperties.LogFileMode = EVENT_TRACE_REAL_TIME_MODE
 	sessionProperties.LogFileNameOffset = 0
@@ -79,78 +89,9 @@ func TestStartTrace(t *testing.T) {
 }
 
 func BuffCB(e *EventTraceLogfile) uintptr {
-	log.Infof("BufferCallback")
+	//log.Infof("BufferCallback")
+	// We must return True otherwise the trace stops
 	return 1
-}
-
-func EvtRecCb(er *EventRecord) uintptr {
-	log.Infof("EventRecord received: %d", er.UserDataLength)
-	log.Infof("EventRecord received: %t", er.EventHeader.Flags&EVENT_HEADER_FLAG_STRING_ONLY == EVENT_HEADER_FLAG_STRING_ONLY)
-	log.Infof("EventProperty = 0x%08x", er.EventHeader.EventProperty)
-	log.Infof("EventPropertyXML = %t", er.EventHeader.EventProperty == EVENT_HEADER_PROPERTY_XML)
-	return 0
-}
-
-func TestEnableTraceEx2(t *testing.T) {
-	var sessionHandle uintptr
-	var loggerInfo EventTraceLogfile
-
-	rand.Seed(time.Now().Unix())
-
-	//logSessionName := fmt.Sprintf("TestStartTraceGolangPOC%d", rand.Uint32())
-	logSessionName := "TestStartTraceGolangPOC"
-	log.Infof("Log Session Name: %s", logSessionName)
-
-	sessionProperties := NewRealTimeSessionProperty(logSessionName)
-
-	err := StartTrace(&sessionHandle, syscall.StringToUTF16Ptr(logSessionName), sessionProperties)
-
-	if err != nil {
-		t.Errorf("Failed to create trace: %s", err)
-	}
-	defer ControlTrace(sessionHandle, nil, sessionProperties, EVENT_TRACE_CONTROL_STOP)
-	if !checkSessionRunning(logSessionName) {
-		t.Errorf("Session is not running")
-	}
-
-	t.Logf("Enabling Trace on GUID: %s", DNSGuid)
-	if err := EnableTraceEx2(
-		sessionHandle,
-		DNSGuid,
-		EVENT_CONTROL_CODE_ENABLE_PROVIDER,
-		TRACE_LEVEL_VERBOSE,
-		0xffffffffffffffff,
-		0,
-		0,
-		nil,
-	); err != nil {
-		t.Errorf("Failed to enable trace: %s", err)
-		t.FailNow()
-	}
-	defer EnableTraceEx2(sessionHandle, DNSGuid, EVENT_CONTROL_CODE_DISABLE_PROVIDER, 0, 0, 0, 0, nil)
-
-	// Consumer Part
-	loggerInfo.SetProcessTraceMode(PROCESS_TRACE_MODE_EVENT_RECORD | PROCESS_TRACE_MODE_RAW_TIMESTAMP | PROCESS_TRACE_MODE_REAL_TIME)
-	loggerInfo.BufferCallback = syscall.NewCallback(BuffCB)
-	loggerInfo.Callback = syscall.NewCallback(EvtRecCb)
-	loggerInfo.Context = 0
-	loggerInfo.LoggerName = syscall.StringToUTF16Ptr(logSessionName)
-
-	traceHandle, err := OpenTrace(&loggerInfo)
-	if err != nil {
-		t.Errorf("Failed to open trace: %s", err)
-		t.FailNow()
-	}
-
-	go func() {
-		if err := ProcessTrace(&traceHandle, 1, nil, nil); err != nil {
-			t.Errorf("Failed to process trace: %s", err)
-			t.FailNow()
-		}
-	}()
-
-	time.Sleep(60 * time.Second)
-	defer CloseTrace(traceHandle)
 }
 
 func randomSvcPid() (pid uint32, service string) {
@@ -217,7 +158,6 @@ func TestServiceEnumerator(t *testing.T) {
 
 	t.Logf("Expected: %s VS Found: %s", expSvc, svc)
 	t.Logf("Non existing PID returned: %s", nasvc)
-
 }
 
 func TestRegGetValueFromString(t *testing.T) {
@@ -231,6 +171,41 @@ func TestRegGetValueFromString(t *testing.T) {
 	}
 	t.Logf("Data type: %d", dtype)
 	t.Logf("Data: %q", data)
+	if p, err := ParseRegValue(data, dtype); err != nil {
+		t.Error(err)
+	} else {
+		t.Logf("Parsed Data: %v", p)
+	}
+}
+
+func parseRegValueOrPanic(path string) interface{} {
+	data, dtype, err := RegGetValueFromString(path)
+	if err != nil {
+		panic(err)
+	}
+
+	if p, err := ParseRegValue(data, dtype); err != nil {
+		panic(err)
+	} else {
+		return p
+	}
+}
+
+func TestParseRegValue(t *testing.T) {
+	bfRoot := `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\`
+	keys := []string{
+		`HKLM\SYSTEM\CurrentControlSet\Control\EarlyStartServices`,
+		bfRoot + `BuildBranch`,
+		bfRoot + `BaseBuildRevisionNumber`,
+		bfRoot + `BuildLabEx`,
+		bfRoot + `DigitalProductId`,
+		bfRoot + `ProductName`,
+		bfRoot + `EditionSubVersion`,
+	}
+
+	for _, key := range keys {
+		t.Logf("%s: %v", key, parseRegValueOrPanic(key))
+	}
 }
 
 func TestRegGetValueSizeFromString(t *testing.T) {
@@ -241,4 +216,24 @@ func TestRegGetValueSizeFromString(t *testing.T) {
 	}
 	t.Logf("Registry value size: %d", size)
 
+}
+
+func TestRegEnumKeys(t *testing.T) {
+	if skeys, err := RegEnumKeys(`HKLM\System\CurrentControlSet\Services`); err != nil {
+		t.Error(err)
+	} else {
+		for _, key := range skeys {
+			t.Log(key)
+		}
+	}
+}
+
+func TestRegEnumValues(t *testing.T) {
+	if values, err := RegEnumValues(`HKLM\System\CurrentControlSet\Enum`); err != nil {
+		t.Error(err)
+	} else {
+		for _, val := range values {
+			t.Log(val)
+		}
+	}
 }
